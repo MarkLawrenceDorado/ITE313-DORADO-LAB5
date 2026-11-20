@@ -44,6 +44,16 @@ class Product extends Model
     }
 
     /**
+     * The single most recent transaction for this product.
+     * ofMany('created_at', 'max') tells Eloquent which row of the
+     * hasMany relationship above counts as "latest" when eager loading.
+     */
+    public function latestTransaction()
+    {
+        return $this->hasOne(InventoryTransaction::class)->ofMany('created_at', 'max');
+    }
+
+    /**
      * Business logic: is this product at or below its reorder level?
      */
     public function isLowStock(): bool
@@ -61,12 +71,36 @@ class Product extends Model
 
     /**
      * Business logic: human-readable stock status, used for badges in views.
+     * (Kept as a plain method from Lab 5 for backward compatibility with
+     * existing Blade views that already call $product->stockStatus().)
      */
     public function stockStatus(): string
     {
         if ($this->isOutOfStock()) return 'out-of-stock';
         if ($this->isLowStock()) return 'low-stock';
         return 'in-stock';
+    }
+
+    /**
+     * Accessor version of the above, as the lab asks for:
+     * $product->stock_status (not stockStatus()) — a human-readable label.
+     */
+    public function getStockStatusAttribute(): string
+    {
+        if ($this->isOutOfStock()) return 'Out of Stock';
+        if ($this->isLowStock()) return 'Low Stock';
+        return 'In Stock';
+    }
+
+    /**
+     * Accessor: Bootstrap color class matching the current stock status,
+     * e.g. for <span class="badge bg-{{ $product->stock_status_color }}">
+     */
+    public function getStockStatusColorAttribute(): string
+    {
+        if ($this->isOutOfStock()) return 'danger';
+        if ($this->isLowStock()) return 'warning';
+        return 'success';
     }
 
     /**
@@ -93,5 +127,14 @@ class Product extends Model
     public function scopeOutOfStock($query)
     {
         return $query->where('quantity', '<=', 0);
+    }
+
+    /**
+     * Query scope: only products in a specific category.
+     * Usage: Product::inCategory('Lumber')->get();
+     */
+    public function scopeInCategory($query, string $category)
+    {
+        return $query->where('category', $category);
     }
 }

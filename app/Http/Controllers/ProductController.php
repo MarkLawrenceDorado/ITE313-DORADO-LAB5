@@ -71,10 +71,26 @@ class ProductController extends Controller
 
     /**
      * Remove a product from the database.
+     *
+     * Note: as of Lab 6, inventory_transactions.product_id uses
+     * restrictOnDelete(), so MySQL itself will refuse to delete a
+     * product that has any transaction history. We catch that here
+     * and show a friendly message instead of a raw 500 error.
      */
     public function destroy(Product $product)
     {
-        $product->delete();
+        try {
+            $product->delete();
+        } catch (\Illuminate\Database\QueryException $e) {
+            // SQLSTATE 23000 = integrity constraint violation (FK restrict)
+            if ($e->getCode() === '23000') {
+                return redirect()
+                    ->route('products.index')
+                    ->with('error', "Cannot delete \"{$product->name}\" — it has transaction history. Products with recorded stock movements can't be deleted, to preserve the audit trail.");
+            }
+
+            throw $e; // re-throw anything else; this handler is only for the FK case
+        }
 
         return redirect()
             ->route('products.index')

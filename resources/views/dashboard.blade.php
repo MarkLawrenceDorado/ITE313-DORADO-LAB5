@@ -4,7 +4,7 @@
 
 @section('content')
 
-    <div class="pb-2 mb-3 border-bottom">
+    <div class="pb-2 mb-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h2 class="mb-0">
             @php
                 $hour = now()->hour;
@@ -12,6 +12,10 @@
             @endphp
             {{ $greeting }}, {{ Auth::user()->name }}!
         </h2>
+        <div class="text-muted small">
+            <span class="badge bg-success"><i class="bi bi-broadcast"></i> Live</span>
+            Updated <span id="lastUpdated">just now</span>
+        </div>
     </div>
 
     {{-- Low Stock Alert Banner --}}
@@ -34,7 +38,7 @@
             <div class="card stat-card text-center">
                 <div class="card-body">
                     <h5 class="card-title text-muted">📦 Total Products</h5>
-                    <h2 class="card-text fw-bold text-primary-custom">{{ $totalProducts }}</h2>
+                    <h2 class="card-text fw-bold text-primary-custom" id="statTotalProducts">{{ $totalProducts }}</h2>
                 </div>
             </div>
         </div>
@@ -42,7 +46,7 @@
             <div class="card stat-card text-center">
                 <div class="card-body">
                     <h5 class="card-title text-muted">💰 Inventory Value</h5>
-                    <h2 class="card-text fw-bold text-success">${{ number_format($totalInventoryValue, 2) }}</h2>
+                    <h2 class="card-text fw-bold text-success" id="statInventoryValue">${{ number_format($totalInventoryValue, 2) }}</h2>
                 </div>
             </div>
         </div>
@@ -50,7 +54,7 @@
             <div class="card stat-card text-center">
                 <div class="card-body">
                     <h5 class="card-title text-muted">⚠️ Low Stock Items</h5>
-                    <h2 class="card-text fw-bold text-warning">{{ $lowStockCount }}</h2>
+                    <h2 class="card-text fw-bold text-warning" id="statLowStock">{{ $lowStockCount }}</h2>
                 </div>
             </div>
         </div>
@@ -58,7 +62,7 @@
             <div class="card stat-card text-center">
                 <div class="card-body">
                     <h5 class="card-title text-muted">🚫 Out of Stock</h5>
-                    <h2 class="card-text fw-bold text-danger">{{ $outOfStockCount }}</h2>
+                    <h2 class="card-text fw-bold text-danger" id="statOutOfStock">{{ $outOfStockCount }}</h2>
                 </div>
             </div>
         </div>
@@ -136,7 +140,7 @@
                                         <th>Status</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="lowStockTableBody">
                                     @foreach ($lowStockProducts as $product)
                                         <tr class="{{ $product->isOutOfStock() ? 'table-danger' : 'table-warning' }}">
                                             <td><a href="{{ route('products.show', $product) }}">{{ $product->name }}</a></td>
@@ -155,6 +159,37 @@
                             </table>
                         </div>
                     @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Recent Transactions (live, refreshed via AJAX polling) --}}
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Transactions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Type</th>
+                                    <th>Quantity</th>
+                                    <th>By</th>
+                                    <th>When</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentTransactionsBody">
+                                {{-- Populated entirely by JS on load and every 30s after.
+                                     Starts empty; dashboard-realtime.js fills it immediately. --}}
+                                <tr><td colspan="5" class="text-center text-muted py-3">Loading recent activity...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -191,3 +226,15 @@
     </script>
     @endpush
 @endif
+
+@push('scripts')
+    {{-- Route URLs passed via data attributes since dashboard-realtime.js
+         is a plain static file and can't call Blade's route() helper. --}}
+    <script
+        src="{{ asset('js/dashboard-realtime.js') }}"
+        data-stats-url="{{ route('api.dashboard.stats') }}"
+        data-low-stock-url="{{ route('api.products.lowStock') }}"
+        data-recent-transactions-url="{{ route('api.transactions.recent') }}"
+        defer>
+    </script>
+@endpush

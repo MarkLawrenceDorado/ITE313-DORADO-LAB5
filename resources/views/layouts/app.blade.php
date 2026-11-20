@@ -26,16 +26,71 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto align-items-lg-center">
-                    <li class="nav-item">
-                        <span class="navbar-text text-white me-3">
-                            Welcome, {{ Auth::user()->name ?? 'User' }}
-                        </span>
+
+                    {{-- Notification bell: guarded so this works even before
+                         Part 6's `notifications` table/migration exists. --}}
+                    @php
+                        $unreadCount = 0;
+                        $recentNotifications = collect();
+                        if (Illuminate\Support\Facades\Schema::hasTable('notifications') && auth()->check()) {
+                            $unreadCount = auth()->user()->unreadNotifications()->count();
+                            $recentNotifications = auth()->user()->notifications()->latest()->take(5)->get();
+                        }
+                    @endphp
+                    <li class="nav-item dropdown me-2">
+                        <a class="nav-link position-relative" href="#" id="notifBell" role="button"
+                           data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-bell-fill text-white fs-5"></i>
+                            @if ($unreadCount > 0)
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                    {{ $unreadCount > 9 ? '9+' : $unreadCount }}
+                                    <span class="visually-hidden">unread notifications</span>
+                                </span>
+                            @endif
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" style="min-width: 320px;" aria-labelledby="notifBell">
+                            <li><h6 class="dropdown-header">Notifications</h6></li>
+                            @forelse ($recentNotifications as $notification)
+                                <li>
+                                    <a class="dropdown-item small {{ $notification->read_at ? 'text-muted' : 'fw-bold' }}"
+                                       href="{{ $notification->data['url'] ?? '#' }}">
+                                        {{ $notification->data['message'] ?? 'Notification' }}
+                                        <div class="text-muted" style="font-size: 0.75rem;">{{ $notification->created_at->diffForHumans() }}</div>
+                                    </a>
+                                </li>
+                            @empty
+                                <li><span class="dropdown-item-text text-muted small">No notifications yet.</span></li>
+                            @endforelse
+                            @if ($unreadCount > 0)
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form method="POST" action="{{ route('notifications.markAllRead') }}" class="px-3">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Mark all as read</button>
+                                    </form>
+                                </li>
+                            @endif
+                        </ul>
                     </li>
-                    <li class="nav-item">
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="btn btn-outline-light btn-sm">Logout</button>
-                        </form>
+
+                    {{-- User dropdown --}}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle text-white" href="#" id="userMenu" role="button"
+                           data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-circle me-1"></i>{{ Auth::user()->name ?? 'User' }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                            <li><h6 class="dropdown-header">{{ Auth::user()->email ?? '' }}</h6></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="bi bi-box-arrow-right me-1"></i> Logout
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
                     </li>
                 </ul>
             </div>
@@ -58,6 +113,16 @@
                                 <i class="bi bi-box-seam me-1"></i> Products
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('transactions.*') ? 'active' : '' }}" href="{{ route('transactions.index') }}">
+                                <i class="bi bi-arrow-left-right me-1"></i> Transactions
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.index') }}">
+                                <i class="bi bi-bar-chart-line me-1"></i> Reports
+                            </a>
+                        </li>
                     </ul>
                 </div>
             </nav>
@@ -68,6 +133,20 @@
                 @if (session('success'))
                     <div class="alert alert-success alert-dismissible fade show border-accent" role="alert">
                         <i class="bi bi-check-circle-fill me-2"></i>{{ session('success') }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                @endif
+
+                @if (session('error'))
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ session('error') }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                @endif
+
+                @if (session('info'))
+                    <div class="alert alert-info alert-dismissible fade show" role="alert">
+                        <i class="bi bi-info-circle-fill me-2"></i>{{ session('info') }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 @endif

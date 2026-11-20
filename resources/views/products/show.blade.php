@@ -7,6 +7,12 @@
     <div class="d-flex justify-content-between align-items-center pb-2 mb-3 border-bottom flex-wrap gap-2">
         <h2 class="mb-0">{{ $product->name }}</h2>
         <div class="d-flex gap-2">
+            <a href="{{ route('transactions.create') }}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-arrow-left-right"></i> Record Transaction
+            </a>
+            <a href="{{ route('adjustments.create', ['product_id' => $product->id]) }}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-sliders"></i> Adjust Stock
+            </a>
             <a href="{{ route('products.edit', $product) }}" class="btn btn-primary btn-sm">
                 <i class="bi bi-pencil"></i> Edit
             </a>
@@ -58,13 +64,7 @@
 
                         <dt class="col-sm-5">Status</dt>
                         <dd class="col-sm-7">
-                            @if ($product->isOutOfStock())
-                                <span class="badge bg-danger">Out of Stock</span>
-                            @elseif ($product->isLowStock())
-                                <span class="badge bg-warning text-dark">Low Stock</span>
-                            @else
-                                <span class="badge bg-success">In Stock</span>
-                            @endif
+                            <span class="badge bg-{{ $product->stock_status_color }}">{{ $product->stock_status }}</span>
                         </dd>
                     </dl>
                 </div>
@@ -72,42 +72,60 @@
         </div>
     </div>
 
-    {{-- Related inventory transactions (only shows if that table/model exists) --}}
-    @if (class_exists(\App\Models\InventoryTransaction::class))
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Recent Stock Movements</h5>
-            </div>
-            <div class="card-body">
-                @php $transactions = $product->transactions()->latest()->take(10)->get(); @endphp
-                @if ($transactions->isEmpty())
-                    <p class="text-muted mb-0">No stock movement history recorded yet.</p>
-                @else
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Type</th>
-                                    <th>Quantity Changed</th>
-                                    <th>Reference</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($transactions as $t)
-                                    <tr>
-                                        <td>{{ $t->created_at->format('Y-m-d H:i') }}</td>
-                                        <td>{{ ucfirst($t->transaction_type) }}</td>
-                                        <td>{{ $t->quantity_changed }}</td>
-                                        <td>{{ $t->reference ?? '—' }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
-            </div>
+    {{-- Transaction history with running balance --}}
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Transaction History</h5>
+            <a href="{{ route('transactions.index', ['product_id' => $product->id]) }}" class="btn btn-sm btn-outline-secondary">
+                View Full History
+            </a>
         </div>
-    @endif
+        <div class="card-body">
+            @php
+                // Last 10 here on the product page; the "View Full History"
+                // link above goes to the paginated, filterable transactions
+                // index for everything beyond that.
+                $transactions = $product->transactions()->with('user')->recent()->take(10)->get();
+            @endphp
+
+            @if ($transactions->isEmpty())
+                <p class="text-muted mb-0">No stock movement history recorded yet.</p>
+            @else
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Quantity Changed</th>
+                                <th>Running Balance</th>
+                                <th>Reference</th>
+                                <th>By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($transactions as $t)
+                                <tr>
+                                    <td>
+                                        <a href="{{ route('transactions.show', $t) }}">{{ $t->created_at->format('Y-m-d H:i') }}</a>
+                                    </td>
+                                    <td><span class="badge bg-{{ $t->type_color }}">{{ $t->type_label }}</span></td>
+                                    <td class="{{ $t->quantity_changed > 0 ? 'text-success' : 'text-danger' }} fw-bold">
+                                        {{ $t->quantity_changed > 0 ? '+' : '' }}{{ $t->quantity_changed }}
+                                    </td>
+                                    {{-- resulting_quantity was stored at the moment this
+                                         transaction was created, so this is a true running
+                                         balance with no recalculation needed. --}}
+                                    <td>{{ $t->resulting_quantity }}</td>
+                                    <td>{{ $t->reference_number ?: '—' }}</td>
+                                    <td>{{ $t->user->name ?? 'Unknown' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+    </div>
 
 @endsection
